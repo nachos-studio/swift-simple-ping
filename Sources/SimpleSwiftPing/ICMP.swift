@@ -49,22 +49,22 @@ public struct ICMPHeader {
 	public var code: UInt8 {didSet {headerBytes[1] = type}}
 	public var checksum: UInt16 {
         didSet {
-            headerBytes[2...].withUnsafeMutableBytes { (bytes: UnsafeMutablePointer<UInt16>) in
-                bytes.pointee = checksum.bigEndian
+            headerBytes[2...].withUnsafeMutableBytes { (bytes: UnsafeMutableRawBufferPointer) in
+                bytes.bindMemory(to: UInt16.self).baseAddress!.pointee = self.checksum.bigEndian
             }
         }
     }
 	public var identifier: UInt16     {
         didSet {
-            headerBytes[4...].withUnsafeMutableBytes { (bytes: UnsafeMutablePointer<UInt16>) in
-                bytes.pointee = identifier.bigEndian
+            headerBytes[4...].withUnsafeMutableBytes { (bytes: UnsafeMutableRawBufferPointer) in
+                bytes.bindMemory(to: UInt16.self).baseAddress!.pointee = self.identifier.bigEndian
             }
         }
     }
 	public var sequenceNumber: UInt16 {
         didSet {
-            headerBytes[6...].withUnsafeMutableBytes { (bytes: UnsafeMutablePointer<UInt16>) in
-                bytes.pointee = sequenceNumber.bigEndian
+            headerBytes[6...].withUnsafeMutableBytes { (bytes: UnsafeMutableRawBufferPointer) in
+                bytes.bindMemory(to: UInt16.self).baseAddress!.pointee = sequenceNumber.bigEndian
             }
         }
     }
@@ -80,8 +80,8 @@ public struct ICMPHeader {
 		sequenceNumber = n
 		
 		headerBytes = Data(count: ICMPHeader.size)
-		headerBytes.withUnsafeMutableBytes{ (bytes: UnsafeMutablePointer<UInt8>) in
-			var curPosUInt8 = bytes
+        headerBytes.withUnsafeMutableBytes { (bytes: UnsafeMutableRawBufferPointer) in
+            var curPosUInt8 = bytes.bindMemory(to: UInt8.self).baseAddress!
 			curPosUInt8.pointee = type; curPosUInt8 = curPosUInt8.advanced(by: 1)
 			curPosUInt8.pointee = code; curPosUInt8 = curPosUInt8.advanced(by: 1)
 			
@@ -100,8 +100,8 @@ public struct ICMPHeader {
 		var checksumI: UInt16 = 0
 		var identifierI: UInt16 = 0
 		var sequenceNumberI: UInt16 = 0
-		data.withUnsafeBytes{ (bytes: UnsafePointer<UInt8>) in
-			var curPosUInt8 = bytes
+		data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+            var curPosUInt8 = bytes.bindMemory(to: UInt8.self).baseAddress!
 			typeI = curPosUInt8.pointee; curPosUInt8 = curPosUInt8.advanced(by: 1)
 			codeI = curPosUInt8.pointee; curPosUInt8 = curPosUInt8.advanced(by: 1)
 			

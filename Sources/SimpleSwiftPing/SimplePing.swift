@@ -44,10 +44,10 @@ public class SimplePing {
 		guard let hostAddress = hostAddress, hostAddress.count >= MemoryLayout<sockaddr>.size else {
 			return sa_family_t(AF_UNSPEC)
 		}
-		
-		return hostAddress.withUnsafeBytes{ (bytes: UnsafePointer<sockaddr>) -> sa_family_t in
-			return bytes.pointee.sa_family
-		}
+
+        return hostAddress.withUnsafeBytes { (rawBufferPointer: UnsafeRawBufferPointer) in
+            return rawBufferPointer.load(as: sockaddr.self).sa_family
+        }
 	}
 	
 	/** The next sequence number to be used by this object.
@@ -143,16 +143,16 @@ public class SimplePing {
 		let err: Int32
 		let bytesSent: Int
 		if let socket = sock {
-			bytesSent = packet.withUnsafeBytes{ (packetBytes: UnsafePointer<UInt8>) -> Int in
-				return hostAddress.withUnsafeBytes{ (hostAddressBytes: UnsafePointer<sockaddr>) -> Int in
-					return sendto(
-						CFSocketGetNative(socket),
-						UnsafeRawPointer(packetBytes), packet.count,
-						0, /* flags */
-						hostAddressBytes, socklen_t(hostAddress.count)
-					)
-				}
-			}
+            bytesSent = packet.withUnsafeBytes { (packetBytes: UnsafeRawBufferPointer) in
+                return hostAddress.withUnsafeBytes { (hostAddressBytes: UnsafeRawBufferPointer) -> Int in
+                    return sendto(
+                        CFSocketGetNative(socket),
+                        packetBytes.baseAddress!, packet.count,
+                        0, /* flags */
+                        hostAddressBytes.baseAddress?.bindMemory(to: sockaddr.self, capacity: 1), socklen_t(hostAddress.count)
+                    )
+                }
+            }
 			if bytesSent >= 0 {err = 0}
 			else              {err = errno}
 		} else {
@@ -208,14 +208,16 @@ public class SimplePing {
 		/* Our algorithm is simple, using a 32 bit accumulator (sum), we
 		 * add sequential 16 bit words to it, and at the end, fold back all the
 		 * carry bits from the top 16 bits into the lower 16 bits. */
-		packetData.withUnsafeBytes{ (bytes: UnsafePointer<UInt16>) in
-			var curPos = bytes
-			assert(packetData.count % 2 == 0)
-			for i in 0..<packetData.count/2 {
-				if i != ICMPHeader.checksumDelta/2 {sum &+= Int32(curPos.pointee)}
-				curPos = curPos.advanced(by: 1)
-			}
-		}
+        packetData.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) -> Void in
+            var curPos = bytes.bindMemory(to: UInt16.self).baseAddress
+            assert(packetData.count % 2 == 0)
+            for i in 0..<packetData.count/2 {
+                if i != ICMPHeader.checksumDelta/2 {
+                    sum &+= Int32(curPos!.pointee)
+                }
+                curPos = curPos!.advanced(by: 1)
+            }
+        }
 		
 		/* Add back carry outs from top 16 bits to low 16 bits */
 		sum   = (sum >> 16) &+ (sum & 0xffff)            /* add hi 16 to low 16 */
@@ -296,7 +298,11 @@ public class SimplePing {
 			 * correct byte order (due to wacky 1's complement maths), so we just
 			 * put it into the packet as a 16-bit unit. */
 			let checksumBig = SimplePing.packetChecksum(packetData: packet)
-			packet[ICMPHeader.checksumDelta...].withUnsafeMutableBytes{ (bytes: UnsafeMutablePointer<UInt16>) in bytes.pointee = checksumBig }
+
+            packet[ICMPHeader.checksumDelta...].withUnsafeMutableBytes { bytes -> Void in
+                bytes.bindMemory(to: UInt16.self).baseAddress?.assign(repeating: checksumBig, count: 1)
+                return
+            }
 		}
 		
 		return packet
@@ -339,7 +345,7 @@ public class SimplePing {
 		
 		/* Note: We crash when we don’t copy the slice content; not sure why… (Xcode 10.0 beta (10L176w)) */
 		let icmpPacket = Data(packet[icmpHeaderOffset...])
-		var icmpHeader = ICMPHeader(data: icmpPacket)
+		let icmpHeader = ICMPHeader(data: icmpPacket)
 		
 		let receivedChecksum = icmpHeader.checksum
 		let calculatedChecksum = UInt16(bigEndian: SimplePing.packetChecksum(packetData: icmpPacket)) /* The checksum method returns a big-endian UInt16 */
@@ -507,14 +513,15 @@ public class SimplePing {
 			for address in addresses {
 				assert(hostAddress == nil)
 				guard address.count >= MemoryLayout<sockaddr>.size else {continue}
-				
-				address.withUnsafeBytes{ (addrPtr: UnsafePointer<sockaddr>) in
-					switch (addrPtr.pointee.sa_family, addressStyle) {
-					case (sa_family_t(AF_INET),  .any), (sa_family_t(AF_INET),  .icmpV4): hostAddress = address; resolved = true
-					case (sa_family_t(AF_INET6), .any), (sa_family_t(AF_INET6), .icmpV6): hostAddress = address; resolved = true
-					default: (/*nop*/)
-					}
-				}
+
+                address.withUnsafeBytes { (addrPtr: UnsafeRawBufferPointer) in
+                    let sa_family = addrPtr.load(as: sockaddr.self).sa_family
+                    switch (sa_family, addressStyle) {
+                    case (sa_family_t(AF_INET),  .any), (sa_family_t(AF_INET),  .icmpV4): hostAddress = address; resolved = true
+                    case (sa_family_t(AF_INET6), .any), (sa_family_t(AF_INET6), .icmpV6): hostAddress = address; resolved = true
+                    default: (/*nop*/)
+                    }
+                }
 				if resolved.boolValue {break}
 			}
 		}
