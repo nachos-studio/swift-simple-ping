@@ -47,9 +47,27 @@ public struct ICMPHeader {
 	
 	public var type: UInt8 {didSet {headerBytes[0] = type}}
 	public var code: UInt8 {didSet {headerBytes[1] = type}}
-	public var checksum: UInt16       {didSet {headerBytes[2...].withUnsafeMutableBytes{ (bytes: UnsafeMutablePointer<UInt16>) in bytes.pointee = checksum.bigEndian }}}
-	public var identifier: UInt16     {didSet {headerBytes[4...].withUnsafeMutableBytes{ (bytes: UnsafeMutablePointer<UInt16>) in bytes.pointee = identifier.bigEndian }}}
-	public var sequenceNumber: UInt16 {didSet {headerBytes[6...].withUnsafeMutableBytes{ (bytes: UnsafeMutablePointer<UInt16>) in bytes.pointee = sequenceNumber.bigEndian }}}
+	public var checksum: UInt16 {
+        didSet {
+            headerBytes[2...].withUnsafeMutableBytes { (bytes: UnsafeMutablePointer<UInt16>) in
+                bytes.pointee = checksum.bigEndian
+            }
+        }
+    }
+	public var identifier: UInt16     {
+        didSet {
+            headerBytes[4...].withUnsafeMutableBytes { (bytes: UnsafeMutablePointer<UInt16>) in
+                bytes.pointee = identifier.bigEndian
+            }
+        }
+    }
+	public var sequenceNumber: UInt16 {
+        didSet {
+            headerBytes[6...].withUnsafeMutableBytes { (bytes: UnsafeMutablePointer<UInt16>) in
+                bytes.pointee = sequenceNumber.bigEndian
+            }
+        }
+    }
 	/* data... */
 	
 	public private(set) var headerBytes: Data
