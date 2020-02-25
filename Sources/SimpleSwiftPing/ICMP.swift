@@ -49,23 +49,35 @@ public struct ICMPHeader {
 	public var code: UInt8 {didSet {headerBytes[1] = type}}
 	public var checksum: UInt16 {
         didSet {
-            headerBytes[2...].withUnsafeMutableBytes { (bytes: UnsafeMutableRawBufferPointer) in
+            var newHeader = Data(headerBytes)
+
+            newHeader[2...].withUnsafeMutableBytes { (bytes: UnsafeMutableRawBufferPointer) in
                 bytes.bindMemory(to: UInt16.self).baseAddress!.pointee = self.checksum.bigEndian
             }
+
+            headerBytes = Data(newHeader)
         }
     }
 	public var identifier: UInt16     {
         didSet {
-            headerBytes[4...].withUnsafeMutableBytes { (bytes: UnsafeMutableRawBufferPointer) in
+            var newHeader = Data(headerBytes)
+
+            newHeader[4...].withUnsafeMutableBytes { (bytes: UnsafeMutableRawBufferPointer) in
                 bytes.bindMemory(to: UInt16.self).baseAddress!.pointee = self.identifier.bigEndian
             }
+
+            headerBytes = Data(newHeader)
         }
     }
 	public var sequenceNumber: UInt16 {
         didSet {
-            headerBytes[6...].withUnsafeMutableBytes { (bytes: UnsafeMutableRawBufferPointer) in
+            var newHeader = Data(headerBytes)
+
+            newHeader[6...].withUnsafeMutableBytes { (bytes: UnsafeMutableRawBufferPointer) in
                 bytes.bindMemory(to: UInt16.self).baseAddress!.pointee = sequenceNumber.bigEndian
             }
+
+            headerBytes = Data(newHeader)
         }
     }
 	/* data... */
@@ -78,9 +90,10 @@ public struct ICMPHeader {
 		checksum = chk
 		identifier = i
 		sequenceNumber = n
-		
-		headerBytes = Data(count: ICMPHeader.size)
-        headerBytes.withUnsafeMutableBytes { (bytes: UnsafeMutableRawBufferPointer) in
+        headerBytes = Data()
+
+		var tempHeader = Data(count: ICMPHeader.size)
+        tempHeader.withUnsafeMutableBytes { (bytes: UnsafeMutableRawBufferPointer) in
             var curPosUInt8 = bytes.bindMemory(to: UInt8.self).baseAddress!
 			curPosUInt8.pointee = type; curPosUInt8 = curPosUInt8.advanced(by: 1)
 			curPosUInt8.pointee = code; curPosUInt8 = curPosUInt8.advanced(by: 1)
@@ -90,6 +103,8 @@ public struct ICMPHeader {
 			curPosUInt16.pointee = identifier.bigEndian; curPosUInt16 = curPosUInt16.advanced(by: 1)
 			curPosUInt16.pointee = sequenceNumber.bigEndian; curPosUInt16 = curPosUInt16.advanced(by: 1)
 		}
+
+        headerBytes = Data(tempHeader)
 	}
 	
 	public init(data: Data) {
